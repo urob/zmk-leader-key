@@ -6,9 +6,11 @@
 
  / {
     behaviors {
-        /omit-if-no-ref/ leader: leader_key {
+#if ZMK_BEHAVIOR_OMIT(LEADER)
+        /omit-if-no-ref/
+#endif
+        leader: leader {
             compatible = "zmk,behavior-leader-key";
-            label = "LEADER";
             #binding-cells = <0>;
         };
     };

@@ -1,10 +1,12 @@
 # ZMK-LEADER-KEY
 
-This module adds a `leader-key` behavior to ZMK. For now, it is a one-for-one
-adaptation of Nick Conway's
+This module adds a `leader-key` behavior to ZMK.
+
+For now, it is a one-for-one adaptation of Nick Conway's
 [PR #1380](https://github.com/zmkfirmware/zmk/pull/1380). Going forward, I plan
 to make a couple of breaking changes such as migrating from a position-based
-sequence spec to a keycode-based one.
+sequence spec to a keycode-based one. The original PR version will continue to
+be available in the `legacy` branch.
 
 ## Usage
 
@@ -25,7 +27,7 @@ manifest:
       import: app/west.yml
     - name: zmk-leader-key
       remote: urob
-      revision: main
+      revision: main # or 'legacy' for the original PR version
   self:
     path: config
 ```

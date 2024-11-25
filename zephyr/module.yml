@@ -1,0 +1,6 @@
+name: zmk-leader-key
+build:
+  cmake: .
+  kconfig: Kconfig
+  settings:
+    dts_root: .

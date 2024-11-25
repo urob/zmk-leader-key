@@ -71,7 +71,7 @@ static struct leader_seq_cfg *sequence_lookup[ZMK_KEYMAP_LEN][CONFIG_ZMK_LEADER_
 
 // Store the leader key pointer in the leader array, one pointer for each key position
 // The leader are sorted shortest-first, then by virtual-key-position.
-static int intitialiaze_leader_sequences(struct leader_seq_cfg *seq) {
+static int intitialize_leader_sequences(struct leader_seq_cfg *seq) {
     for (int i = 0; i < seq->key_position_len; i++) {
         int32_t position = seq->key_positions[i];
         if (position >= ZMK_KEYMAP_LEN) {
@@ -353,13 +353,13 @@ ZMK_SUBSCRIPTION(leader, zmk_position_state_changed);
         .layers_len = DT_PROP_LEN(n, layers),                                                      \
     };
 
-#define INTITIALIAZE_LEADER_SEQUENCES(n) intitialiaze_leader_sequences(&sequence_config_##n);
+#define INTITIALIZE_LEADER_SEQUENCES(n) intitialize_leader_sequences(&sequence_config_##n);
 
 DT_INST_FOREACH_CHILD(0, LEADER_INST)
 
 static int leader_init(void) {
     k_work_init_delayable(&release_timer, behavior_leader_key_timer_handler);
-    DT_INST_FOREACH_CHILD(0, INTITIALIAZE_LEADER_SEQUENCES);
+    DT_INST_FOREACH_CHILD(0, INTITIALIZE_LEADER_SEQUENCES);
     //. Pete: Ditto, this adds unnecessary complexity since only a single instance of the node is supported.
     return 0;
 }

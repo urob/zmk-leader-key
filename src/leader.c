@@ -29,15 +29,9 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 static bool leader_status;
 static int32_t press_count;
 static int32_t release_count;
-static int32_t timeout_ms;
 static int32_t active_leader_position;
 static int8_t layer;
 static bool first_release;
-static struct k_work_delayable release_timer;
-static int64_t release_at;
-// static bool timer_started;
-static bool timer_cancelled;
-static bool timerless;
 
 struct leader_seq_cfg {
     int32_t key_positions[CONFIG_ZMK_LEADER_MAX_KEYS_PER_SEQUENCE];
@@ -216,37 +210,14 @@ static inline int release_leader_behavior(struct leader_seq_cfg *sequence, int32
     return behavior_keymap_binding_released(&sequence->behavior, event);
 }
 
-static int stop_timer() {
-    int timer_cancel_result = k_work_cancel_delayable(&release_timer);
-    if (timer_cancel_result == -EINPROGRESS) {
-        // too late to cancel, we'll let the timer handler clear up.
-        timer_cancelled = true;
-    }
-    return timer_cancel_result;
-}
-
-static void reset_timer(int32_t timestamp) {
-    release_at = timestamp + timeout_ms;
-    int32_t ms_left = release_at - k_uptime_get();
-    if (ms_left > 0) {
-        k_work_schedule(&release_timer, K_MSEC(ms_left));
-        LOG_DBG("Successfully reset leader timer");
-    }
-}
-
-void zmk_leader_activate(int32_t timeout, bool _timerless, uint32_t position) {
+void zmk_leader_activate(uint32_t position) {
     LOG_DBG("leader key activated");
     leader_status = true;
     press_count = 0;
     release_count = 0;
-    timeout_ms = timeout;
     active_leader_position = position;
     layer = zmk_keymap_highest_layer_active();
     first_release = false;
-    timerless = _timerless;
-    if (!timerless) {
-        reset_timer(k_uptime_get());
-    }
     for (int i = 0; i < CONFIG_ZMK_LEADER_MAX_KEYS_PER_SEQUENCE; i++) {
         leader_pressed_keys[i] = NULL;
     }
@@ -257,23 +228,6 @@ void zmk_leader_deactivate() {
     leader_status = false;
     clear_candidates();
 };
-
-void behavior_leader_key_timer_handler(struct k_work *item) {
-    if (!leader_status) {
-        return;
-    }
-    if (timer_cancelled) {
-        return;
-    }
-    LOG_DBG("Leader deactivated due to timeout");
-    for (int i = 0; i < num_comp_candidates; i++) {
-        if (!completed_sequence_candidates[i]->is_pressed) {
-            press_leader_behavior(completed_sequence_candidates[i], k_uptime_get());
-            release_leader_behavior(completed_sequence_candidates[i], k_uptime_get());
-        }
-    }
-    zmk_leader_deactivate();
-}
 
 static int position_state_changed_listener(const zmk_event_t *ev) {
     struct zmk_position_state_changed *data = as_zmk_position_state_changed(ev);
@@ -292,7 +246,6 @@ static int position_state_changed_listener(const zmk_event_t *ev) {
         if (data->state) { // keydown
             leader_find_candidates(data->position, press_count);
             LOG_DBG("leader cands: %d comp: %d", num_candidates, num_comp_candidates);
-            stop_timer();
             current_sequence[press_count] = data->position;
             leader_pressed_keys[press_count] = data;
             press_count++;
@@ -328,9 +281,6 @@ static int position_state_changed_listener(const zmk_event_t *ev) {
                     zmk_leader_deactivate();
                 }
             }
-            if (!timerless || num_comp_candidates < num_candidates) {
-                reset_timer(data->timestamp);
-            }
         }
         return ZMK_EV_EVENT_HANDLED;
     }
@@ -358,7 +308,6 @@ ZMK_SUBSCRIPTION(leader, zmk_position_state_changed);
 DT_INST_FOREACH_CHILD(0, LEADER_INST)
 
 static int leader_init(void) {
-    k_work_init_delayable(&release_timer, behavior_leader_key_timer_handler);
     DT_INST_FOREACH_CHILD(0, INTITIALIZE_LEADER_SEQUENCES);
     //. Pete: Ditto, this adds unnecessary complexity since only a single instance of the node is supported.
     return 0;

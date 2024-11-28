@@ -36,7 +36,6 @@ struct leader_seq_cfg {
     int32_t key_positions[CONFIG_ZMK_LEADER_MAX_KEYS_PER_SEQUENCE];
     int32_t key_position_len;
 
-    bool immediate_trigger;
     bool is_pressed;
     // the virtual key position is a key position outside the range used by the keyboard.
     // it is necessary so hold-taps can uniquely identify a behavior.
@@ -234,7 +233,7 @@ static int position_state_changed_listener(const zmk_event_t *ev) {
             press_count++;
             for (int i = 0; i < num_comp_candidates; i++) {
                 struct leader_seq_cfg *seq = completed_sequence_candidates[i];
-                if (seq->immediate_trigger || (num_candidates == 1 && num_comp_candidates == 1)) {
+                if (num_candidates == 1 && num_comp_candidates == 1) {
                     press_leader_behavior(seq, data->timestamp);
                 }
             }
@@ -277,7 +276,6 @@ ZMK_SUBSCRIPTION(leader, zmk_position_state_changed);
 #define LEADER_INST(n)                                                                             \
     static struct leader_seq_cfg sequence_config_##n = {                                           \
         .virtual_key_position = ZMK_VIRTUAL_KEY_POSITION_LEADER(__COUNTER__),                      \
-        .immediate_trigger = DT_PROP(n, immediate_trigger),                                        \
         .is_pressed = false,                                                                       \
         .key_positions = DT_PROP(n, key_positions),                                                \
         .key_position_len = DT_PROP_LEN(n, key_positions),                                         \

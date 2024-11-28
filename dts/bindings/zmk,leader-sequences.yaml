@@ -15,5 +15,3 @@ child-binding:
     key-positions:
       type: array
       required: true
-    immediate-trigger:
-      type: boolean

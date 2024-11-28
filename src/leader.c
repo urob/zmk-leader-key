@@ -53,12 +53,14 @@ static uint32_t current_sequence[CONFIG_ZMK_LEADER_MAX_KEYS_PER_SEQUENCE] = {-1}
 // the set of candidate leader based on the currently leader_pressed_keys
 static int num_candidates;
 static struct leader_seq_cfg *sequence_candidates[CONFIG_ZMK_LEADER_MAX_SEQUENCES_PER_KEY];
-// TODO: simplify handling of completed_sequence_candidates as we no longer allow for nested sequences
+// TODO: simplify handling of completed_sequence_candidates as we no longer allow for nested
+// sequences
 static int num_comp_candidates;
-static struct leader_seq_cfg *completed_sequence_candidates[CONFIG_ZMK_LEADER_MAX_SEQUENCES_PER_KEY];
+static struct leader_seq_cfg
+    *completed_sequence_candidates[CONFIG_ZMK_LEADER_MAX_SEQUENCES_PER_KEY];
 // a lookup dict that maps a key position to all sequences on that position
-static struct leader_seq_cfg *sequence_lookup[ZMK_KEYMAP_LEN][CONFIG_ZMK_LEADER_MAX_SEQUENCES_PER_KEY] = {
-    NULL};
+static struct leader_seq_cfg
+    *sequence_lookup[ZMK_KEYMAP_LEN][CONFIG_ZMK_LEADER_MAX_SEQUENCES_PER_KEY] = {NULL};
 
 // Store the sequence key pointer in the sequence_lookup array, one pointer for each key position.
 // The sequences are sorted shortest-first, then by virtual-key-position.
@@ -160,8 +162,8 @@ static void leader_find_candidates(int32_t position, int count) {
         if (sequence == NULL) {
             continue;
         }
-        if (sequence->key_positions[count] == position &&
-            has_current_sequence(sequence, count) && !is_duplicate(sequence)) {
+        if (sequence->key_positions[count] == position && has_current_sequence(sequence, count) &&
+            !is_duplicate(sequence)) {
             sequence_candidates[num_candidates] = sequence;
             num_candidates++;
             if (sequence->key_position_len == count + 1) {
@@ -290,7 +292,6 @@ DT_INST_FOREACH_CHILD(0, LEADER_INST)
 
 static int leader_init(void) {
     DT_INST_FOREACH_CHILD(0, INTITIALIZE_LEADER_SEQUENCES);
-    //. Pete: Ditto, this adds unnecessary complexity since only a single instance of the node is supported.
     return 0;
 }
 

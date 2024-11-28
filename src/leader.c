@@ -181,7 +181,7 @@ static inline int press_leader_behavior(struct leader_seq_cfg *sequence, int32_t
     };
 
     sequence->is_pressed = true;
-    return behavior_keymap_binding_pressed(&sequence->behavior, event);
+    return zmk_behavior_invoke_binding(&sequence->behavior, event, true);
 }
 
 static inline int release_leader_behavior(struct leader_seq_cfg *sequence, int32_t timestamp) {
@@ -191,7 +191,7 @@ static inline int release_leader_behavior(struct leader_seq_cfg *sequence, int32
     };
 
     sequence->is_pressed = false;
-    return behavior_keymap_binding_released(&sequence->behavior, event);
+    return zmk_behavior_invoke_binding(&sequence->behavior, event, false);
 }
 
 void zmk_leader_activate(uint32_t position) {

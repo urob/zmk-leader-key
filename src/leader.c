@@ -53,14 +53,15 @@ static uint32_t current_sequence[CONFIG_ZMK_LEADER_MAX_KEYS_PER_SEQUENCE] = {-1}
 // the set of candidate leader based on the currently leader_pressed_keys
 static int num_candidates;
 static struct leader_seq_cfg *sequence_candidates[CONFIG_ZMK_LEADER_MAX_SEQUENCES_PER_KEY];
+// TODO: simplify handling of completed_sequence_candidates as we no longer allow for nested sequences
 static int num_comp_candidates;
 static struct leader_seq_cfg *completed_sequence_candidates[CONFIG_ZMK_LEADER_MAX_SEQUENCES_PER_KEY];
 // a lookup dict that maps a key position to all sequences on that position
 static struct leader_seq_cfg *sequence_lookup[ZMK_KEYMAP_LEN][CONFIG_ZMK_LEADER_MAX_SEQUENCES_PER_KEY] = {
     NULL};
 
-// Store the leader key pointer in the leader array, one pointer for each key position
-// The leader are sorted shortest-first, then by virtual-key-position.
+// Store the sequence key pointer in the sequence_lookup array, one pointer for each key position.
+// The sequences are sorted shortest-first, then by virtual-key-position.
 static int intitialize_leader_sequences(struct leader_seq_cfg *seq) {
     for (int i = 0; i < seq->key_position_len; i++) {
         int32_t position = seq->key_positions[i];
@@ -83,7 +84,7 @@ static int intitialize_leader_sequences(struct leader_seq_cfg *seq) {
                  sequence_at_j->virtual_key_position < new_seq->virtual_key_position)) {
                 continue;
             }
-            // put new_seq in this spot, move all other leader up.
+            // Put new_seq in this spot, move all other leader up.
             sequence_lookup[position][j] = new_seq;
             new_seq = sequence_at_j;
         }
@@ -214,20 +215,24 @@ void zmk_leader_deactivate() {
 static int position_state_changed_listener(const zmk_event_t *ev) {
     struct zmk_position_state_changed *data = as_zmk_position_state_changed(ev);
     if (data == NULL) {
-        return 0;
+        return ZMK_EV_EVENT_BUBBLE;
     }
 
     if (!leader_status && !data->state && !all_keys_released()) {
         if (release_key_in_sequence(data->position)) {
             return ZMK_EV_EVENT_HANDLED;
         }
-        return 0;
+        return ZMK_EV_EVENT_BUBBLE;
     }
 
     if (leader_status) {
         if (data->state) { // keydown
             leader_find_candidates(data->position, press_count);
             LOG_DBG("leader cands: %d comp: %d", num_candidates, num_comp_candidates);
+            if (num_candidates == 0) {
+                zmk_leader_deactivate();
+                return ZMK_EV_EVENT_BUBBLE;
+            }
             current_sequence[press_count] = data->position;
             leader_pressed_keys[press_count] = data;
             press_count++;
@@ -238,16 +243,13 @@ static int position_state_changed_listener(const zmk_event_t *ev) {
                 }
             }
         } else { // keyup
+            // Don't do anything when the leader key itself is first released.
             if (data->position == active_leader_position && !first_release) {
                 first_release = true;
-                return 0;
+                return ZMK_EV_EVENT_HANDLED;
             }
             if (!is_in_current_sequence(data->position)) {
-                return 0;
-            }
-            if (num_candidates == 0) {
-                zmk_leader_deactivate();
-                return ZMK_EV_EVENT_HANDLED;
+                return ZMK_EV_EVENT_BUBBLE;
             }
 
             release_count++;

@@ -30,7 +30,6 @@ static bool leader_status;
 static int32_t press_count;
 static int32_t release_count;
 static int32_t active_leader_position;
-static int8_t layer;
 static bool first_release;
 
 struct leader_seq_cfg {
@@ -43,8 +42,6 @@ struct leader_seq_cfg {
     // it is necessary so hold-taps can uniquely identify a behavior.
     int32_t virtual_key_position;
     struct zmk_behavior_binding behavior;
-    int32_t layers_len;
-    int8_t layers[];
 };
 
 // leader_pressed_keys is filled with an event when a key is pressed.
@@ -99,19 +96,6 @@ static int intitialize_leader_sequences(struct leader_seq_cfg *seq) {
         }
     }
     return 0;
-}
-
-static bool sequence_active_on_layer(struct leader_seq_cfg *sequence) {
-    if (sequence->layers[0] == -1) {
-        // -1 in the first layer position is global layer scope
-        return true;
-    }
-    for (int j = 0; j < sequence->layers_len; j++) {
-        if (sequence->layers[j] == layer) {
-            return true;
-        }
-    }
-    return false;
 }
 
 static bool has_current_sequence(struct leader_seq_cfg *sequence, int count) {
@@ -176,7 +160,7 @@ static void leader_find_candidates(int32_t position, int count) {
         if (sequence == NULL) {
             continue;
         }
-        if (sequence_active_on_layer(sequence) && sequence->key_positions[count] == position &&
+        if (sequence->key_positions[count] == position &&
             has_current_sequence(sequence, count) && !is_duplicate(sequence)) {
             sequence_candidates[num_candidates] = sequence;
             num_candidates++;
@@ -216,7 +200,6 @@ void zmk_leader_activate(uint32_t position) {
     press_count = 0;
     release_count = 0;
     active_leader_position = position;
-    layer = zmk_keymap_highest_layer_active();
     first_release = false;
     for (int i = 0; i < CONFIG_ZMK_LEADER_MAX_KEYS_PER_SEQUENCE; i++) {
         leader_pressed_keys[i] = NULL;
@@ -299,8 +282,6 @@ ZMK_SUBSCRIPTION(leader, zmk_position_state_changed);
         .key_positions = DT_PROP(n, key_positions),                                                \
         .key_position_len = DT_PROP_LEN(n, key_positions),                                         \
         .behavior = ZMK_KEYMAP_EXTRACT_BINDING(0, n),                                              \
-        .layers = DT_PROP(n, layers),                                                              \
-        .layers_len = DT_PROP_LEN(n, layers),                                                      \
     };
 
 #define INTITIALIZE_LEADER_SEQUENCES(n) intitialize_leader_sequences(&sequence_config_##n);

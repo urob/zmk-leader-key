@@ -15,8 +15,5 @@ child-binding:
     key-positions:
       type: array
       required: true
-    layers:
-      type: array
-      default: [-1]
     immediate-trigger:
       type: boolean

@@ -7,3 +7,13 @@ compatible: "zmk,behavior-leader-key"
 
 include: zero_param.yaml
 
+child-binding:
+  description: "A leader sequence"
+
+  properties:
+    bindings:
+      type: phandle-array
+      required: true
+    key-positions:
+      type: array
+      required: true

@@ -11,12 +11,6 @@ config ZMK_LEADER_MAX_SEQUENCES_PER_KEY
 #Leader options
 endmenu
 
-DT_COMPAT_ZMK_LEADER := zmk,leader-sequences
-
-config ZMK_LEADER
-    bool
-    default $(dt_compat_enabled,$(DT_COMPAT_ZMK_LEADER))
-
 DT_COMPAT_ZMK_BEHAVIOR_LEADER_KEY := zmk,behavior-leader-key
 
 config ZMK_BEHAVIOR_LEADER_KEY

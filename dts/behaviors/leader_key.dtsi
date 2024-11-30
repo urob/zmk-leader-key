@@ -13,7 +13,6 @@
 #endif
         leader: leader {
             compatible = "zmk,behavior-leader-key";
-            label = "LEADER";
             #binding-cells = <0>;
         };
     };

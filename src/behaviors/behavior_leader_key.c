@@ -27,167 +27,37 @@
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
-struct leader_sequence_config {
+struct leader_seq_cfg {
+    int32_t virtual_key_position;
+    bool is_pressed;
     int32_t key_position_len;
     int32_t key_positions[CONFIG_ZMK_LEADER_MAX_KEYS_PER_SEQUENCE];
-
-    bool is_pressed;
-    // Assign unique virtual key position to each sequence to work along hold-taps.
-    int32_t virtual_key_position;
     struct zmk_behavior_binding behavior;
 };
 
 struct behavior_leader_key_config {
     size_t sequences_len;
-    struct leader_sequence_config *sequences;
+    struct leader_seq_cfg *sequences;
 };
 
-struct active_leader_key {
-    bool is_undecided;
-    int32_t press_count;
-    int32_t release_count;
-    int32_t active_leader_position;
-    bool first_release;
-    const struct behavior_leader_key_config *config;
-};
-static struct active_leader_key active_leader_key = {};
+const struct behavior_leader_key_config *active_leader_cfg;
 
-static uint32_t current_sequence[CONFIG_ZMK_LEADER_MAX_KEYS_PER_SEQUENCE] = {-1};
+// State of currently active leader key instance.
+static bool is_undecided;
+static int32_t press_count;   /* Total number of pressed keys */
+static int32_t release_count; /* Number of currently pressed keys */
+static int32_t num_candidates;
+static struct leader_seq_cfg *sequence_candidates[CONFIG_ZMK_LEADER_MAX_SEQUENCES];
+static struct leader_seq_cfg *completed_sequence;
 
-// This is a variant of current_sequence where keys are removed as they are released.
+// Keep track of pressed keys so we can handle their release events.
 static const struct zmk_position_state_changed
-    *leader_pressed_keys[CONFIG_ZMK_LEADER_MAX_KEYS_PER_SEQUENCE] = {NULL};
+    *leader_pressed_keys[CONFIG_ZMK_LEADER_MAX_KEYS_PER_SEQUENCE];
 
-// the set of candidate leader based on the currently leader_pressed_keys
-static int candidates_len;
-static struct leader_sequence_config *sequence_candidates[CONFIG_ZMK_LEADER_MAX_SEQUENCES_PER_KEY];
-
-// TODO: simplify handling of completed_sequence_candidates as we no longer allow for nested
-// sequences
-static int num_comp_candidates;
-static struct leader_sequence_config
-    *completed_sequence_candidates[CONFIG_ZMK_LEADER_MAX_SEQUENCES_PER_KEY];
-// a lookup dict that maps a key position to all sequences on that position
-static struct leader_sequence_config
-    *sequence_lookup[ZMK_KEYMAP_LEN][CONFIG_ZMK_LEADER_MAX_SEQUENCES_PER_KEY] = {NULL};
-
-// Store the sequence key pointer in the sequence_lookup array, one pointer for each key position.
-// The sequences are sorted shortest-first, then by virtual-key-position.
-static int initialize_leader_sequences(struct leader_sequence_config *seq) {
-    for (int i = 0; i < seq->key_position_len; i++) {
-        int32_t position = seq->key_positions[i];
-        if (position >= ZMK_KEYMAP_LEN) {
-            LOG_ERR("Unable to initialize leader, key position %d does not exist", position);
-            return -EINVAL;
-        }
-
-        struct leader_sequence_config *new_seq = seq;
-        bool set = false;
-        for (int j = 0; j < CONFIG_ZMK_LEADER_MAX_SEQUENCES_PER_KEY; j++) {
-            struct leader_sequence_config *sequence_at_j = sequence_lookup[position][j];
-            if (sequence_at_j == NULL) {
-                sequence_lookup[position][j] = new_seq;
-                set = true;
-                break;
-            }
-            if (sequence_at_j->key_position_len < new_seq->key_position_len ||
-                (sequence_at_j->key_position_len == new_seq->key_position_len &&
-                 sequence_at_j->virtual_key_position < new_seq->virtual_key_position)) {
-                continue;
-            }
-            // Put new_seq in this spot, move all other leader up.
-            sequence_lookup[position][j] = new_seq;
-            new_seq = sequence_at_j;
-        }
-        if (!set) {
-            LOG_ERR(
-                "Too many leader for key position %d, CONFIG_ZMK_LEADER_MAX_SEQUENCES_PER_KEY %d.",
-                position, CONFIG_ZMK_LEADER_MAX_SEQUENCES_PER_KEY);
-            return -ENOMEM;
-        }
-    }
-    return 0;
-}
-
-static bool has_current_sequence(struct leader_sequence_config *sequence, int count) {
-    for (int i = 0; i < count; i++) {
-        if (sequence->key_positions[i] != current_sequence[i]) {
-            return false;
-        }
-    }
-    return true;
-}
-
-static bool is_in_current_sequence(int32_t position) {
-    for (int i = 0; i < CONFIG_ZMK_LEADER_MAX_KEYS_PER_SEQUENCE; i++) {
-        if (position == current_sequence[i]) {
-            return true;
-        }
-    }
-    return false;
-}
-
-static bool is_duplicate(struct leader_sequence_config *seq) {
-    for (int i = 0; i < CONFIG_ZMK_LEADER_MAX_KEYS_PER_SEQUENCE; i++) {
-        if (sequence_candidates[i] == seq) {
-            return true;
-        }
-    }
-    return false;
-}
-
-static bool release_key_in_sequence(int32_t position) {
-    for (int i = 0; i < active_leader_key.release_count; i++) {
-        if (leader_pressed_keys[i] && position == leader_pressed_keys[i]->position) {
-            leader_pressed_keys[i] = NULL;
-            return true;
-        }
-    }
-    return false;
-}
-
-static bool all_keys_released() {
-    for (int i = 0; i < active_leader_key.press_count; i++) {
-        if (NULL != leader_pressed_keys[i]) {
-            return false;
-        }
-    }
-    return true;
-}
-
-static void clear_candidates() {
-    for (int i = 0; i < CONFIG_ZMK_LEADER_MAX_SEQUENCES_PER_KEY; i++) {
-        sequence_candidates[i] = NULL;
-        completed_sequence_candidates[i] = NULL;
-    }
-}
-
-static void leader_find_candidates(int32_t position, int count) {
-    clear_candidates();
-    candidates_len = 0;
-    num_comp_candidates = 0;
-    for (int i = 0; i < CONFIG_ZMK_LEADER_MAX_SEQUENCES_PER_KEY; i++) {
-        struct leader_sequence_config *sequence = sequence_lookup[position][i];
-        if (sequence == NULL) {
-            continue;
-        }
-        if (sequence->key_positions[count] == position && has_current_sequence(sequence, count) &&
-            !is_duplicate(sequence)) {
-            sequence_candidates[candidates_len] = sequence;
-            candidates_len++;
-            if (sequence->key_position_len == count + 1) {
-                completed_sequence_candidates[num_comp_candidates] = sequence;
-                num_comp_candidates++;
-            }
-        }
-    }
-}
-
-const struct zmk_listener zmk_listener_leader;
-
-static inline int press_leader_behavior(struct leader_sequence_config *sequence,
-                                        int32_t timestamp) {
+static inline int press_leader_behavior(struct leader_seq_cfg *sequence, int32_t timestamp) {
+    LOG_DBG("Pressing leader binding");
     struct zmk_behavior_binding_event event = {
+        // Assign unique virtual key position to each sequence to work along hold-taps.
         .position = sequence->virtual_key_position,
         .timestamp = timestamp,
     };
@@ -196,8 +66,8 @@ static inline int press_leader_behavior(struct leader_sequence_config *sequence,
     return zmk_behavior_invoke_binding(&sequence->behavior, event, true);
 }
 
-static inline int release_leader_behavior(struct leader_sequence_config *sequence,
-                                          int32_t timestamp) {
+static inline int release_leader_behavior(struct leader_seq_cfg *sequence, int32_t timestamp) {
+    LOG_DBG("Releasing leader binding");
     struct zmk_behavior_binding_event event = {
         .position = sequence->virtual_key_position,
         .timestamp = timestamp,
@@ -207,24 +77,66 @@ static inline int release_leader_behavior(struct leader_sequence_config *sequenc
     return zmk_behavior_invoke_binding(&sequence->behavior, event, false);
 }
 
-void activate_leader_sequence(uint32_t position, const struct behavior_leader_key_config *cfg) {
-    LOG_DBG("leader key activated");
-    active_leader_key.is_undecided = true;
-    active_leader_key.config = cfg;
-    active_leader_key.press_count = 0;
-    active_leader_key.release_count = 0;
-    active_leader_key.active_leader_position = position;
-    active_leader_key.first_release = false;
+void activate_leader_key(const struct behavior_leader_key_config *cfg) {
+    LOG_DBG("Activating leader key");
+    active_leader_cfg = cfg;
+    is_undecided = true;
+    press_count = 0;
+    release_count = 0;
+    completed_sequence = NULL;
+    num_candidates = cfg->sequences_len;
+    for (int i = 0; i < cfg->sequences_len; i++) {
+        sequence_candidates[i] = &(cfg->sequences[i]);
+    }
     for (int i = 0; i < CONFIG_ZMK_LEADER_MAX_KEYS_PER_SEQUENCE; i++) {
         leader_pressed_keys[i] = NULL;
     }
 };
 
-void deactivate_leader_sequence() {
-    LOG_DBG("leader key deactivated");
-    active_leader_key.is_undecided = false;
-    clear_candidates();
+void deactivate_leader_key() {
+    LOG_DBG("Deactivating leader key");
+    is_undecided = false;
 };
+
+// This function filters out candidate sequences that are no longer possible given the pressed
+// sequence of keys. The function returns false if no sequences are possible and otherwise true. If
+// a sequence is completed, it is stored in completed_sequence.
+static bool filter_leader_sequences(int32_t position, int count) {
+    int n = 0; /* New number of candidates */
+    for (int i = 0; i < num_candidates; i++) {
+        struct leader_seq_cfg *seq = sequence_candidates[n];
+        if (seq->key_positions[count] == position) {
+            if (seq->key_position_len == count + 1) {
+                LOG_DBG("%d completes sequence", position);
+                completed_sequence = seq;
+                return true;
+            }
+            n++;
+        } else {
+            for (int j = n; j < num_candidates - (i - n) - 1; j++) {
+                sequence_candidates[j] = sequence_candidates[j + 1];
+            }
+        }
+    }
+
+    LOG_DBG("Key press on %d, %d candidate sequences remaining", position, n);
+    num_candidates = n;
+    return (n > 0);
+};
+
+static bool release_key_in_leader_sequence(int32_t position) {
+    for (int i = 0; i < release_count; i++) {
+        if (leader_pressed_keys[i] && position == leader_pressed_keys[i]->position) {
+            for (int j = i; j < release_count; j++) {
+                leader_pressed_keys[j] = leader_pressed_keys[j + 1];
+            }
+            release_count--;
+            LOG_DBG("Key release on %d, %d pressed keys remaining", position, release_count);
+            return true;
+        }
+    }
+    return false;
+}
 
 static int position_state_changed_listener(const zmk_event_t *ev) {
     struct zmk_position_state_changed *data = as_zmk_position_state_changed(ev);
@@ -232,83 +144,57 @@ static int position_state_changed_listener(const zmk_event_t *ev) {
         return ZMK_EV_EVENT_BUBBLE;
     }
 
-    // Handle release of keys that are part of a completed sequence.
-    if (!active_leader_key.is_undecided && !data->state && !all_keys_released()) {
-        if (release_key_in_sequence(data->position)) {
+    // A key is pressed while leader is active.
+    if (is_undecided && data->state) {
+        if (filter_leader_sequences(data->position, press_count++)) {
+            leader_pressed_keys[release_count++] = data;
+            if (completed_sequence) {
+                press_leader_behavior(completed_sequence, data->timestamp);
+                deactivate_leader_key();
+            }
             return ZMK_EV_EVENT_HANDLED;
+        } else {
+            deactivate_leader_key();
+            return ZMK_EV_EVENT_BUBBLE;
         }
-        return ZMK_EV_EVENT_BUBBLE;
     }
 
-    if (active_leader_key.is_undecided) {
-        if (data->state) { // keydown
-            leader_find_candidates(data->position, active_leader_key.press_count);
-            LOG_DBG("leader cands: %d comp: %d", candidates_len, num_comp_candidates);
-            if (candidates_len == 0) {
-                deactivate_leader_sequence();
-                return ZMK_EV_EVENT_BUBBLE;
-            }
-            current_sequence[active_leader_key.press_count] = data->position;
-            leader_pressed_keys[active_leader_key.press_count] = data;
-            active_leader_key.press_count++;
-            for (int i = 0; i < num_comp_candidates; i++) {
-                struct leader_sequence_config *seq = completed_sequence_candidates[i];
-                if (candidates_len == 1 && num_comp_candidates == 1) {
-                    press_leader_behavior(seq, data->timestamp);
-                }
-            }
-        } else { // keyup
-            // Don't do anything when the leader key itself is first released.
-            if (data->position == active_leader_key.active_leader_position &&
-                !active_leader_key.first_release) {
-                active_leader_key.first_release = true;
-                return ZMK_EV_EVENT_HANDLED;
-            }
-            if (!is_in_current_sequence(data->position)) {
-                return ZMK_EV_EVENT_BUBBLE;
-            }
-
-            active_leader_key.release_count++;
-            release_key_in_sequence(data->position);
-
-            for (int i = 0; i < num_comp_candidates; i++) {
-                struct leader_sequence_config *seq = completed_sequence_candidates[i];
-                if (seq->is_pressed && all_keys_released()) {
-                    release_leader_behavior(seq, data->timestamp);
-                    num_comp_candidates--;
-                }
-                if (candidates_len == 1 && num_comp_candidates == 0) {
-                    deactivate_leader_sequence();
-                }
-            }
+    // A key in the current sequence is released. Release the invoked behavior if its the last one.
+    if (!data->state && release_key_in_leader_sequence(data->position)) {
+        if (completed_sequence && completed_sequence->is_pressed && !release_count) {
+            release_leader_behavior(completed_sequence, data->timestamp);
         }
         return ZMK_EV_EVENT_HANDLED;
     }
 
-    return 0;
+    return ZMK_EV_EVENT_BUBBLE;
 }
 
 ZMK_LISTENER(leader, position_state_changed_listener);
 ZMK_SUBSCRIPTION(leader, zmk_position_state_changed);
 
 static int behavior_leader_key_init(const struct device *dev) {
-    const struct behavior_leader_key_config *cfg = dev->config;
-    for (int i = 0; i < cfg->sequences_len; i++) {
-        initialize_leader_sequences(&cfg->sequences[i]);
-    }
+    // const struct behavior_leader_key_config *cfg = dev->config;
+    // for (int i = 0; i < cfg->sequences_len; i++) {
+    //     initialize_leader_sequences(&cfg->sequences[i]);
+    // }
     return 0;
 }
 
 static int on_keymap_binding_pressed(struct zmk_behavior_binding *binding,
                                      struct zmk_behavior_binding_event event) {
+    if (release_count) {
+        LOG_ERR("Unable to activate leader key. Previous sequence is still pressed.");
+        return ZMK_BEHAVIOR_OPAQUE;
+    }
     const struct device *dev = device_get_binding(binding->behavior_dev);
-    activate_leader_sequence(event.position, dev->config);
+    activate_leader_key(dev->config);
     return ZMK_BEHAVIOR_OPAQUE;
 }
 
 static int on_keymap_binding_released(struct zmk_behavior_binding *binding,
                                       struct zmk_behavior_binding_event event) {
-    return 0;
+    return ZMK_BEHAVIOR_OPAQUE;
 }
 
 static const struct behavior_driver_api behavior_leader_key_driver_api = {
@@ -324,28 +210,29 @@ static const struct behavior_driver_api behavior_leader_key_driver_api = {
         .behavior = ZMK_KEYMAP_EXTRACT_BINDING(0, s),                                              \
     }
 
-int zmk_leader_sequence_compare(const void *a, const void *b) {
-    struct leader_sequence_config *seq_a = (struct leader_sequence_config *)a;
-    struct leader_sequence_config *seq_b = (struct leader_sequence_config *)b;
-    if (seq_a->key_position_len < seq_b->key_position_len) {
-        return 1;
-    }
-    if (seq_a->key_position_len > seq_b->key_position_len) {
-        return -1;
-    }
-    if (seq_a->virtual_key_position < seq_b->virtual_key_position) {
-        return 1;
-    }
-    if (seq_a->virtual_key_position > seq_b->virtual_key_position) {
-        return -1;
-    }
-    return 0;
-}
+// int zmk_leader_sequence_compare(const void *a, const void *b) {
+//     struct leader_seq_cfg *seq_a = (struct leader_seq_cfg *)a;
+//     struct leader_seq_cfg *seq_b = (struct leader_seq_cfg *)b;
+//     if (seq_a->key_position_len < seq_b->key_position_len) {
+//         return 1;
+//     }
+//     if (seq_a->key_position_len > seq_b->key_position_len) {
+//         return -1;
+//     }
+//     if (seq_a->virtual_key_position < seq_b->virtual_key_position) {
+//         return 1;
+//     }
+//     if (seq_a->virtual_key_position > seq_b->virtual_key_position) {
+//         return -1;
+//     }
+//     return 0;
+// }
+//
+// qsort(leader_sequences_##n, ARRAY_SIZE(leader_sequences_##n), sizeof(leader_sequences_##n[0])
+//       zmk_leader_sequence_compare);
 
-    /*qsort(leader_sequences_##n, ARRAY_SIZE(leader_sequences_##n), sizeof(leader_sequences_##n[0]), \*/
-    /*      zmk_leader_sequence_compare);                                                            \*/
 #define LEAD_INST(n)                                                                               \
-    static struct leader_sequence_config leader_sequences_##n[] = {                                \
+    static struct leader_seq_cfg leader_sequences_##n[] = {                                        \
         DT_INST_FOREACH_CHILD_STATUS_OKAY_SEP(n, PROP_SEQUENCES, (, ))};                           \
     static struct behavior_leader_key_config behavior_leader_key_config_##n = {                    \
         .sequences = leader_sequences_##n,                                                         \

@@ -66,9 +66,9 @@ sequence takes two arguments `sequence` and `bindings`. Example:
             #binding-cells = <0>;
             usb { sequence = <U S B>; bindings = <&out OUT_USB>; };
             ble { sequence = <B L E>; bindings = <&out OUT_BLE>; };
-            bt0 { sequence = <B 0>; bindings = <&bt BT_SEL 0>; };
-            bt1 { sequence = <B 1>; bindings = <&bt BT_SEL 1>; };
-            bt2 { sequence = <B 2>; bindings = <&bt BT_SEL 2>; };
+            bt0 { sequence = <B N0>; bindings = <&bt BT_SEL 0>; };
+            bt1 { sequence = <B N1>; bindings = <&bt BT_SEL 1>; };
+            bt2 { sequence = <B N2>; bindings = <&bt BT_SEL 2>; };
             btc { sequence = <C L E A R>; bindings = <&bt BT_CLR>; };
         };
 

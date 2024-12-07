@@ -191,13 +191,7 @@ static int leader_keycode_state_changed_listener(const zmk_event_t *eh) {
 ZMK_LISTENER(leader, leader_keycode_state_changed_listener);
 ZMK_SUBSCRIPTION(leader, zmk_keycode_state_changed);
 
-static int behavior_leader_key_init(const struct device *dev) {
-    // const struct behavior_leader_key_config *cfg = dev->config;
-    // for (int i = 0; i < cfg->sequences_len; i++) {
-    //     initialize_leader_sequences(&cfg->sequences[i]);
-    // }
-    return 0;
-}
+static int behavior_leader_key_init(const struct device *dev) { return 0; }
 
 static int on_keymap_binding_pressed(struct zmk_behavior_binding *binding,
                                      struct zmk_behavior_binding_event event) {
@@ -231,30 +225,9 @@ static const struct behavior_driver_api behavior_leader_key_driver_api = {
         .behavior = ZMK_KEYMAP_EXTRACT_BINDING(0, n),                                              \
     }
 
-// int zmk_leader_sequence_compare(const void *a, const void *b) {
-//     struct leader_seq_cfg *seq_a = (struct leader_seq_cfg *)a;
-//     struct leader_seq_cfg *seq_b = (struct leader_seq_cfg *)b;
-//     if (seq_a->keys_len < seq_b->keys_len) {
-//         return 1;
-//     }
-//     if (seq_a->keys_len > seq_b->keys_len) {
-//         return -1;
-//     }
-//     if (seq_a->virtual_key_position < seq_b->virtual_key_position) {
-//         return 1;
-//     }
-//     if (seq_a->virtual_key_position > seq_b->virtual_key_position) {
-//         return -1;
-//     }
-//     return 0;
-// }
-//
-// qsort(leader_sequences_##n, ARRAY_SIZE(leader_sequences_##n), sizeof(leader_sequences_##n[0])
-//       zmk_leader_sequence_compare);
-
 #define LEAD_INST(n)                                                                               \
     static struct leader_seq_cfg leader_sequences_##n[] = {                                        \
-        DT_INST_FOREACH_CHILD_STATUS_OKAY_SEP_VARGS(n, PROP_SEQUENCES, (, ), key_sequence)};       \
+        DT_INST_FOREACH_CHILD_STATUS_OKAY_SEP_VARGS(n, PROP_SEQUENCES, (, ), sequence)};           \
     static struct behavior_leader_key_config behavior_leader_key_config_##n = {                    \
         .sequences = leader_sequences_##n,                                                         \
         .sequences_len = ARRAY_SIZE(leader_sequences_##n),                                         \

@@ -6,7 +6,7 @@ config ZMK_LEADER_MAX_KEYS_PER_SEQUENCE
 
 config ZMK_LEADER_MAX_SEQUENCES
     int "Maximum number of leader sequences"
-    default 30
+    default 32
 
 #Leader options
 endmenu

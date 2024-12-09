@@ -1,0 +1,8 @@
+Activating leader key
+Pressed usage_page 0x07 keycode 0x27 implicit_mods 0x00, 2 candidate sequences remaining
+Released usage_page 0x07 keycode 0x27 implicit_mods 0x00, 0 pressed keys remaining
+Sequence completed by 0x07 - 0x1E
+Deactivating leader key
+Pressing leader binding
+Released usage_page 0x07 keycode 0x1E implicit_mods 0x00, 0 pressed keys remaining
+Releasing leader binding

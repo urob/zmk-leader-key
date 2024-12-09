@@ -1,0 +1,118 @@
+name: Reusable module tests
+
+on:
+  workflow_call:
+    inputs:
+      tests_path:
+        description: "Path to the tests directory"
+        default: "tests"
+        required: false
+        type: string
+
+jobs:
+  collect-tests:
+    outputs:
+      test_cases: ${{ env.test_cases }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Find test directories
+        working-directory: ${{ inputs.tests_path }}
+        run: |
+          test_cases=$(find * -name native_posix_64.keymap -exec dirname \{\} \; | sed "s#^\./##" | jq -R -s -c 'split("\n")[:-1]')
+          echo "test_cases=${test_cases}" >> $GITHUB_ENV
+          jq <<< ${test_cases}
+
+  run-tests:
+    runs-on: ubuntu-latest
+    container:
+      image: docker.io/zmkfirmware/zmk-build-arm:3.5
+    needs: collect-tests
+    strategy:
+      matrix:
+        test: ${{ fromJSON(needs.collect-tests.outputs.test_cases) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create build directory
+        run: |
+          echo "build_dir=$(mktemp -d)" >> $GITHUB_ENV
+
+      - name: Copy test files to isolated temporary directory
+        run: |
+          base_dir="${TMPDIR:-/tmp}/zmk-module-tests"
+          mkdir -p "${base_dir}/${{ inputs.tests_path }}"
+          cp -R ${{ inputs.tests_path }}/* "${base_dir}/${{ inputs.tests_path }}/"
+          echo "base_dir=${base_dir}" >> $GITHUB_ENV
+
+      - name: Cache west modules
+        uses: actions/cache@v4
+        continue-on-error: true
+        env:
+          cache-name: cache-zephyr-modules
+        with:
+          path: |
+            ${{ env.base_dir }}/modules/
+            ${{ env.base_dir }}/tools/
+            ${{ env.base_dir }}/zephyr/
+            ${{ env.base_dir }}/bootloader/
+            ${{ env.base_dir }}/zmk/
+          key:
+            ${{ runner.os }}-build-${{ env.cache-name }}-${{
+            hashFiles('**/west.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+
+      - name: Initialize workspace (west init)
+        working-directory: ${{ env.base_dir }}
+        run: west init -l "${{ env.base_dir }}/${{ inputs.tests_path }}"
+
+      - name: Update modules (west update)
+        working-directory: ${{ env.base_dir }}
+        run: west update
+
+      - name: Export Zephyr CMake package (west zephyr-export)
+        working-directory: ${{ env.base_dir }}
+        run: west zephyr-export
+
+      - name: West Build (${{ matrix.test }})
+        working-directory: ${{ env.base_dir }}
+        env:
+          config_dir: ${{ env.base_dir }}/${{ inputs.tests_path }}/${{ matrix.test }}
+        run:
+          west build -s zmk/app -d "${{ env.build_dir }}" -b native_posix_64 -- \
+            -DCONFIG_ASSERT=y -DZMK_CONFIG="${config_dir}" -DZMK_EXTRA_MODULES="${GITHUB_WORKSPACE}"
+
+      - name: Test
+        working-directory: ${{ env.base_dir }}
+        env:
+          in: ${{ inputs.tests_path }}/${{ matrix.test }}
+          out: ${{ env.build_dir }}
+        run: |
+          ${out}/zephyr/zmk.exe | sed -e "s/.*> //" |
+            tee ${out}/keycode_events_full.log |
+            sed -n -f ${in}/events.patterns > ${out}/keycode_events.log
+          diff -auZ ${in}/keycode_events.snapshot ${out}/keycode_events.log
+          if [ $? -gt 0 ]; then
+              if [ -f ${in}/pending ]; then
+                  echo "PENDING: ${{ matrix.test }}" | tee -a ${out}/pass-fail.log
+                  exit 0
+              fi
+
+              echo "FAILED: ${{ matrix.test }}" | tee -a ${out}/pass-fail.log
+              exit 1
+          fi
+          echo "PASS: ${{ matrix.test }}" | tee -a ${out}/pass-fail.log
+          exit 0
+
+      - name: Archive artifacts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: "log-files"
+          path: ${{ env.build_dir }}/**/*.log

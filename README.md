@@ -14,7 +14,7 @@ important differences are:
   single-instance restriction of the original PR.
 
 A one-for-one port of the original PR version as a ZMK module is available in
-the `legacy` branch.
+the [`legacy`](https://github.com/urob/zmk-leader-key/tree/legacy) branch.
 
 ## Usage
 
@@ -31,11 +31,12 @@ manifest:
   projects:
     - name: zmk
       remote: urob
-      revision: main
+      revision: v0.1
       import: app/west.yml
     - name: zmk-leader-key
       remote: urob
-      revision: v0.1 # or 'main' for the latest, or 'legacy' for the original PR version
+      revision: v0.1 # keep this in sync with the ZMK revision above,
+                     # or set to 'main' for latest version (may lead to breaking changes)
   self:
     path: config
 ```
@@ -87,5 +88,15 @@ This sets up two leader key instances, `leader1` and `leader2`. The first one
 has various bluetooth and output related sequences, the second one is for German
 umlauts (the `&de_*` bindings must be defined elsewhere).
 
-My personal [zmk-config](https://github.com/urob/zmk-config) has more advanced
-examples.
+**Note:** By default, modifiers in sequences are treated as a lower bound. For
+example, holding `LSHFT` will trigger sequence `LS(A) LS(B)` as well as sequence
+`A B`, whereas not holding any modifier will only trigger `A B`. This is so that
+case-sensitive behavior bindings work as expected.
+
+## References
+
+- The [legacy](https://github.com/urob/zmk-leader-key/tree/legacy) branch ports
+  Nick Conway's PR [#1380](https://github.com/zmkfirmware/zmk/pull/1380) as a
+  ZMK module.
+- My personal [zmk-config](https://github.com/urob/zmk-config) contains advanced
+  usage examples.

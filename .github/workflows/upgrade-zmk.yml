@@ -1,0 +1,71 @@
+name: Upgrade to latest ZMK version
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Runs every day at 22:00 UTC (17:00 ET)
+    - cron: "0 22 * * *"
+
+env:
+  upstream: zmkfirmware/zmk
+  west_path: tests/west.yml
+  upgrade_branch: upgrade-zmk
+  upgrade-label: "upgrade-version"
+
+jobs:
+  upgrade-zmk:
+    name: Upgrade ZMK & open PR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+
+      - name: Get latest ZMK version
+        id: get-zmk-version
+        run: |
+          ZMK_VERSION=$(curl -s https://api.github.com/repos/${{ env.upstream }}/releases/latest | jq -r '.tag_name')
+          echo "ZMK_VERSION=${ZMK_VERSION%.*}" >> $GITHUB_ENV
+          echo "ZMK_VERSION: ${ZMK_VERSION%.*}"
+
+      - name: Upgrade ZMK version
+        run: |
+          export ver=${{ env.ZMK_VERSION }}
+          yq e -i '(.manifest.projects[] | select(.name=="zmk") | .revision) = env(ver)' ${{ env.west_path }}
+          cat ${{ env.west_path }}
+
+      - name: Detect changes
+        id: changes
+        run:
+          # This output boolean tells us if the dependencies have actually changed
+          echo "count=$(git status --porcelain=v1 2>/dev/null | wc -l)" >> $GITHUB_OUTPUT
+
+      - name: Commit & push changes
+        # Only push if changes exist
+        if: steps.changes.outputs.count > 0
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git commit -a -m "Upgrade ZMK to ${{ env.ZMK_VERSION }}"
+          git push -f origin ${{ github.ref_name }}:${{ env.upgrade_branch }}
+
+      - name: Open pull request if needed
+        if: steps.changes.outputs.count > 0
+        run: |
+          # Personal access token requires: Repo read access to metadata, read & write acess to actions and pull requests
+          # https://docs.github.com/en/actions/using-workflows/triggering-a-workflow#triggering-a-workflow-from-a-workflow
+          echo "${{ secrets.ACTIONS_UPGRADE_ZMK }}" | gh auth login --with-token
+          # Only open a PR if the branch is not attached to an existing one
+          PR=$(gh pr list --head ${{ env.upgrade_branch }} --json number -q '.[0].number')
+          if [ -z $PR ]; then
+            gh pr create \
+            --head ${{ env.upgrade_branch }} \
+            --title "Upgrade ZMK to ${{ env.ZMK_VERSION }}" \
+            --label "${{ env.upgrade-label }}" \
+            --body "Full log: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          else
+            echo "Pull request already exists, won't create a new one."
+          fi

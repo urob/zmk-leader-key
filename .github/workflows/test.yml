@@ -1,4 +1,4 @@
-name: Tests
+name: Run tests
 
 on:
   workflow_dispatch:
@@ -17,4 +17,4 @@ on:
 
 jobs:
   build:
-    uses: urob/zmk-leader-key/.github/workflows/run-module-tests.yml@main
+    uses: urob/zmk-modules-actions/.github/workflows/run-tests.yml@main

@@ -240,8 +240,7 @@ static int behavior_leader_key_init(const struct device *dev) { return 0; }
 
 #define PROP_SEQUENCES(n, prop)                                                                    \
     {                                                                                              \
-        .virtual_key_position = ZMK_VIRTUAL_KEY_POSITION_LEADER(__COUNTER__),                      \
-        .is_pressed = false,                                                                       \
+        .virtual_key_position = ZMK_VIRTUAL_KEY_POSITION_LEADER(__COUNTER__), .is_pressed = false, \
         .keys_len = DT_PROP_LEN(n, prop),                                                          \
         .keys = {LISTIFY(DT_PROP_LEN(n, prop), SEQUENCE_ITEM, (, ), n, prop)},                     \
         .behavior = ZMK_KEYMAP_EXTRACT_BINDING(0, n),                                              \

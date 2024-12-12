@@ -172,7 +172,7 @@ static int on_keymap_binding_pressed(struct zmk_behavior_binding *binding,
         LOG_ERR("Unable to activate leader key. Previous sequence is still pressed.");
         return ZMK_BEHAVIOR_OPAQUE;
     }
-    const struct device *dev = device_get_binding(binding->behavior_dev);
+    const struct device *dev = zmk_behavior_get_binding(binding->behavior_dev);
     activate_leader_key(dev->config);
     return ZMK_BEHAVIOR_OPAQUE;
 }

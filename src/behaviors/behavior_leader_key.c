@@ -166,6 +166,32 @@ static bool release_key_in_leader_sequence(const struct zmk_key_param *key) {
     return false;
 }
 
+static int on_keymap_binding_pressed(struct zmk_behavior_binding *binding,
+                                     struct zmk_behavior_binding_event event) {
+    if (release_count) {
+        LOG_ERR("Unable to activate leader key. Previous sequence is still pressed.");
+        return ZMK_BEHAVIOR_OPAQUE;
+    }
+    const struct device *dev = device_get_binding(binding->behavior_dev);
+    activate_leader_key(dev->config);
+    return ZMK_BEHAVIOR_OPAQUE;
+}
+
+static int on_keymap_binding_released(struct zmk_behavior_binding *binding,
+                                      struct zmk_behavior_binding_event event) {
+    return ZMK_BEHAVIOR_OPAQUE;
+}
+
+static const struct behavior_driver_api behavior_leader_key_driver_api = {
+    .binding_pressed = on_keymap_binding_pressed,
+    .binding_released = on_keymap_binding_released,
+};
+
+static int leader_keycode_state_changed_listener(const zmk_event_t *eh);
+
+ZMK_LISTENER(behavior_leader_key, leader_keycode_state_changed_listener);
+ZMK_SUBSCRIPTION(behavior_leader_key, zmk_keycode_state_changed);
+
 static int leader_keycode_state_changed_listener(const zmk_event_t *eh) {
     struct zmk_keycode_state_changed *ev = as_zmk_keycode_state_changed(eh);
     if (ev == NULL) {
@@ -208,31 +234,7 @@ static int leader_keycode_state_changed_listener(const zmk_event_t *eh) {
     return ZMK_EV_EVENT_BUBBLE;
 }
 
-ZMK_LISTENER(leader, leader_keycode_state_changed_listener);
-ZMK_SUBSCRIPTION(leader, zmk_keycode_state_changed);
-
 static int behavior_leader_key_init(const struct device *dev) { return 0; }
-
-static int on_keymap_binding_pressed(struct zmk_behavior_binding *binding,
-                                     struct zmk_behavior_binding_event event) {
-    if (release_count) {
-        LOG_ERR("Unable to activate leader key. Previous sequence is still pressed.");
-        return ZMK_BEHAVIOR_OPAQUE;
-    }
-    const struct device *dev = device_get_binding(binding->behavior_dev);
-    activate_leader_key(dev->config);
-    return ZMK_BEHAVIOR_OPAQUE;
-}
-
-static int on_keymap_binding_released(struct zmk_behavior_binding *binding,
-                                      struct zmk_behavior_binding_event event) {
-    return ZMK_BEHAVIOR_OPAQUE;
-}
-
-static const struct behavior_driver_api behavior_leader_key_driver_api = {
-    .binding_pressed = on_keymap_binding_pressed,
-    .binding_released = on_keymap_binding_released,
-};
 
 #define SEQUENCE_ITEM(i, n, prop) ZMK_KEY_PARAM_DECODE(DT_PROP_BY_IDX(n, prop, i))
 

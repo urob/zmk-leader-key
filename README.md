@@ -35,8 +35,9 @@ manifest:
       import: app/west.yml
     - name: zmk-leader-key
       remote: urob
-      revision: v0.1 # keep this in sync with the ZMK revision above,
-                     # or set to 'main' for latest version (may lead to breaking changes)
+      revision:
+        v0.1 # keep this in sync with the ZMK revision above,
+        # or set to 'main' for latest version (may lead to breaking changes)
   self:
     path: config
 ```
@@ -55,6 +56,8 @@ Zephyr. If you are building using Github Actions, you may need to clear your
 cache (in the left sidebar on the `Actions` tab) for the changes to take effect.
 
 ## Configuration
+
+### Leader sequences
 
 Leader sequences are defined as child nodes of a leader-key instance. Each
 sequence takes two arguments `sequence` and `bindings`. Example:
@@ -92,6 +95,13 @@ umlauts (the `&de_*` bindings must be defined elsewhere).
 example, holding `LSHFT` will trigger sequence `LS(A) LS(B)` as well as sequence
 `A B`, whereas not holding any modifier will only trigger `A B`. This is so that
 case-sensitive behavior bindings work as expected.
+
+### Behavior properties
+
+**`ignore-keys`** (optional): If set to a list of key codes, these keys are
+ignored when evaluating sequences. For instance, if
+`ignore-keys = <LSHFT RSHFT>`, "shift" is passed through without triggering or
+terminating sequences.
 
 ## References
 

@@ -7,6 +7,14 @@ compatible: "zmk,behavior-leader-key"
 
 include: zero_param.yaml
 
+properties:
+  ignore-keys:
+    type: array
+    description: |
+      List of key codes that are passed through without being considered when
+      checking for leader key sequences.
+    default: []
+
 child-binding:
   description: "A leader sequence"
 

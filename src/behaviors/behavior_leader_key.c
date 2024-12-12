@@ -28,6 +28,11 @@
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
+struct key_list {
+    size_t size;
+    struct zmk_key_param keys[];
+};
+
 struct leader_seq_cfg {
     int32_t virtual_key_position;
     bool is_pressed;
@@ -39,6 +44,7 @@ struct leader_seq_cfg {
 struct behavior_leader_key_config {
     size_t sequences_len;
     struct leader_seq_cfg *sequences;
+    const struct key_list *ignore_keys;
 };
 
 const struct behavior_leader_key_config *active_leader_cfg;
@@ -106,6 +112,16 @@ static bool key_param_equals(const struct zmk_key_param *key, const struct zmk_k
            (key->modifiers & (other->modifiers | zmk_hid_get_explicit_mods())) == key->modifiers;
 }
 
+static bool key_is_ignored(const struct zmk_key_param *key) {
+    const struct key_list *ignore_keys = active_leader_cfg->ignore_keys;
+    for (int i = 0; i < ignore_keys->size; i++) {
+        if (key_param_equals(&ignore_keys->keys[i], key)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // This function filters out candidate sequences that are no longer possible given the pressed
 // sequence of keys. The function returns false if no sequences are possible and otherwise true. If
 // a sequence is completed, it is stored in completed_sequence.
@@ -164,6 +180,10 @@ static int leader_keycode_state_changed_listener(const zmk_event_t *eh) {
 
     // A key is pressed while leader is active.
     if (is_undecided && ev->state) {
+        if (key_is_ignored(&key)) {
+            LOG_DBG("Ignoring key press 0x%02X - 0x%02X", (&key)->page, (&key)->id);
+            return ZMK_EV_EVENT_BUBBLE;
+        }
         if (filter_leader_sequences(&key, press_count++)) {
             leader_pressed_keys[release_count++] = key;
             if (completed_sequence) {
@@ -225,12 +245,24 @@ static const struct behavior_driver_api behavior_leader_key_driver_api = {
         .behavior = ZMK_KEYMAP_EXTRACT_BINDING(0, n),                                              \
     }
 
+#define KEY_LIST_ITEM(i, n, prop) ZMK_KEY_PARAM_DECODE(DT_INST_PROP_BY_IDX(n, prop, i))
+
+#define PROP_KEY_LIST(n, prop)                                                                     \
+    COND_CODE_1(DT_NODE_HAS_PROP(DT_DRV_INST(n), prop),                                            \
+                ({                                                                                 \
+                    .size = DT_INST_PROP_LEN(n, prop),                                             \
+                    .keys = {LISTIFY(DT_INST_PROP_LEN(n, prop), KEY_LIST_ITEM, (, ), n, prop)},    \
+                }),                                                                                \
+                ({.size = 0}))
+
 #define LEAD_INST(n)                                                                               \
     static struct leader_seq_cfg leader_sequences_##n[] = {                                        \
         DT_INST_FOREACH_CHILD_STATUS_OKAY_SEP_VARGS(n, PROP_SEQUENCES, (, ), sequence)};           \
+    static const struct key_list leader_key_ignore_keys_##n = PROP_KEY_LIST(n, ignore_keys);       \
     static struct behavior_leader_key_config behavior_leader_key_config_##n = {                    \
         .sequences = leader_sequences_##n,                                                         \
         .sequences_len = ARRAY_SIZE(leader_sequences_##n),                                         \
+        .ignore_keys = &leader_key_ignore_keys_##n,                                                \
     };                                                                                             \
     BEHAVIOR_DT_INST_DEFINE(n, behavior_leader_key_init, NULL, NULL,                               \
                             &behavior_leader_key_config_##n, POST_KERNEL,                          \

@@ -7,6 +7,7 @@
         leader: leader {
             compatible = "zmk,behavior-leader-key";
             #binding-cells = <0>;
+            ignore-keys = <LSHFT>;
 
             leader_seq_one {
                 sequence = <N0 N1>;
@@ -30,7 +31,7 @@
         default_layer {
             bindings = <
                 &kp N0 &kp N1
-                &kp N2 &leader
+                &kp LSHFT &leader
             >;
         };
     };

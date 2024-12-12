@@ -1,0 +1,16 @@
+Activating leader key
+Ignoring key press 0x07 - 0xE1
+kp_pressed: usage_page 0x07 keycode 0xE1 implicit_mods 0x00 explicit_mods 0x00
+Modifier 1 count 1
+Modifiers set to 0x02
+Sequence completed by 0x07 - 0x1E
+Deactivating leader key
+Pressing leader binding
+kp_pressed: usage_page 0x07 keycode 0x06 implicit_mods 0x00 explicit_mods 0x00
+Released usage_page 0x07 keycode 0x1E implicit_mods 0x00, 0 pressed keys remaining
+Releasing leader binding
+kp_released: usage_page 0x07 keycode 0x06 implicit_mods 0x00 explicit_mods 0x00
+kp_released: usage_page 0x07 keycode 0xE1 implicit_mods 0x00 explicit_mods 0x00
+Modifier 1 count: 0
+Modifier 1 released
+Modifiers set to 0x00

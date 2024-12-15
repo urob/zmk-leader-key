@@ -111,6 +111,13 @@ ignored when evaluating sequences. For instance, if
 `ignore-keys = <LSHFT RSHFT>`, "shift" is passed through without triggering or
 terminating sequences.
 
+### `Kconfig` options
+
+- `CONFIG_ZMK_LEADER_MAX_KEYS_PER_SEQUENCE`: Maximum number of keys in a
+  sequence. Default is 5.
+- `CONFIG_ZMK_LEADER_MAX_SEQUENCES`: Maximum number of sequences per leader key
+  instance. Default is 32.
+
 ## References
 
 - The [legacy](https://github.com/urob/zmk-leader-key/tree/legacy) branch ports

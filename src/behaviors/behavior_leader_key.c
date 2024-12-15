@@ -51,6 +51,9 @@ const struct behavior_leader_key_config *active_leader_cfg;
 
 // State of currently active leader key instance.
 static bool is_undecided;
+#if IS_ENABLED(CONFIG_ZMK_SPLIT)
+static uint8_t source;
+#endif
 static int32_t press_count;   /* Total number of pressed keys */
 static int32_t release_count; /* Number of currently pressed keys */
 static int32_t num_candidates;
@@ -65,6 +68,9 @@ static inline int press_leader_behavior(struct leader_seq_cfg *sequence, int32_t
     struct zmk_behavior_binding_event event = {
         // Assign unique virtual key position to each sequence to work along hold-taps.
         .position = sequence->virtual_key_position,
+#if IS_ENABLED(CONFIG_ZMK_SPLIT)
+        .source = source,
+#endif
         .timestamp = timestamp,
     };
 
@@ -76,6 +82,9 @@ static inline int release_leader_behavior(struct leader_seq_cfg *sequence, int32
     LOG_DBG("Releasing leader binding");
     struct zmk_behavior_binding_event event = {
         .position = sequence->virtual_key_position,
+#if IS_ENABLED(CONFIG_ZMK_SPLIT)
+        .source = source,
+#endif
         .timestamp = timestamp,
     };
 
@@ -174,6 +183,9 @@ static int on_keymap_binding_pressed(struct zmk_behavior_binding *binding,
     }
     const struct device *dev = zmk_behavior_get_binding(binding->behavior_dev);
     activate_leader_key(dev->config);
+#if IS_ENABLED(CONFIG_ZMK_SPLIT)
+    source = event.source;
+#endif
     return ZMK_BEHAVIOR_OPAQUE;
 }
 

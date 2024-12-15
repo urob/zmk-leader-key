@@ -8,6 +8,7 @@ important differences are:
 - Sequences are `keycode`-based instead of `position`-based.
 - Multiple leader-key instances with distinct sets of sequences are supported.
 - Key codes that terminate the behavior are bubbled to other behaviors.
+- Sequences inherit locality from the leader key (useful for `&sys_reset` and `&bootloader`).
 - Strictly nested sequences are considered bad form and aren't supported.
 - The `timeout`, `immediate-trigger` and `layers` properties are removed as
   their primary intend is to support nested sequences and to work around the
@@ -74,6 +75,8 @@ sequence takes two arguments `sequence` and `bindings`. Example:
             bt1 { sequence = <B N1>; bindings = <&bt BT_SEL 1>; };
             bt2 { sequence = <B N2>; bindings = <&bt BT_SEL 2>; };
             btc { sequence = <C L E A R>; bindings = <&bt BT_CLR>; };
+            boot { sequence = <B O O T>; bindings = <&bootloader>; };
+            reset { sequence = <R E S E T>; bindings = <&sys_reset>; };
         };
 
         leader2: leader2 {
@@ -88,13 +91,18 @@ sequence takes two arguments `sequence` and `bindings`. Example:
 ```
 
 This sets up two leader key instances, `leader1` and `leader2`. The first one
-has various bluetooth and output related sequences, the second one is for German
-umlauts (the `&de_*` bindings must be defined elsewhere).
+has various system related sequences, the second one is for German umlauts (the
+`&de_*` bindings must be defined elsewhere).
 
 **Note:** By default, modifiers in sequences are treated as a lower bound. For
 example, holding `LSHFT` will trigger sequence `LS(A) LS(B)` as well as sequence
 `A B`, whereas not holding any modifier will only trigger `A B`. This is so that
 case-sensitive behavior bindings work as expected.
+
+**Locality:** Sequence bindings inherit their locality from the position of the
+leader key. For example, on split keyboards, the `BOOT` and `RESET` sequences in
+the example above will invoke the bootloader on the side on which `&leader1` is
+bound. Tip: Add `&leader1` to both sides to be able to reset either side.
 
 ### Behavior properties
 

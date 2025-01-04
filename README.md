@@ -8,7 +8,8 @@ important differences are:
 - Sequences are `keycode`-based instead of `position`-based.
 - Multiple leader-key instances with distinct sets of sequences are supported.
 - Key codes that terminate the behavior are bubbled to other behaviors.
-- Sequences inherit locality from the leader key (useful for `&sys_reset` and `&bootloader`).
+- Sequences inherit locality from the leader key (useful for `&sys_reset` and
+  `&bootloader`).
 - Strictly nested sequences are considered bad form and aren't supported.
 - The `timeout`, `immediate-trigger` and `layers` properties are removed as
   their primary intend is to support nested sequences and to work around the
@@ -32,16 +33,18 @@ manifest:
   projects:
     - name: zmk
       remote: urob
-      revision: v0.1
+      revision: v0.1 # Set to desired ZMK version.
       import: app/west.yml
     - name: zmk-leader-key
       remote: urob
-      revision:
-        v0.1 # keep this in sync with the ZMK revision above,
-        # or set to 'main' for latest version (may lead to breaking changes)
+      revision: v0.1 # Set to same version as ZMK.
   self:
     path: config
 ```
+
+Note: This module uses a version scheme that is synchronized with upstream ZMK.
+To ensure compatibility, I highly recommend setting the revision of this module
+to the same as ZMK's.
 
 **Important:** The `zephyr` remote used by upstream ZMK currently contains a bug
 that under certain circumstances causes the build to fail. You will need the

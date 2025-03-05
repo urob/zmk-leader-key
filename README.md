@@ -33,11 +33,11 @@ manifest:
   projects:
     - name: zmk
       remote: urob
-      revision: v0.1 # Set to desired ZMK version.
+      revision: v0.2+fix-child-nodes
       import: app/west.yml
     - name: zmk-leader-key
       remote: urob
-      revision: v0.1 # Set to same version as ZMK.
+      revision: v0.2 # set to same as ZMK version above
   self:
     path: config
 ```
@@ -47,15 +47,15 @@ To ensure compatibility, I highly recommend setting the revision of this module
 to the same as ZMK's.
 
 **Important:** The `zephyr` remote used by upstream ZMK currently contains a bug
-that under certain circumstances causes the build to fail. You will need the
-patch if your build fails with an error message like:
+that under certain circumstances causes the build to fail. You will need to
+patch yours if your build fails with an error message like:
 
 ```
 ERROR: /behavior/leader-key POST_KERNEL 31 < /behaviors/foo POST_KERNEL 49
 ```
 
-The simplest way to getting the patch is to use my `zmk` remote, as configured
-in above manifest. This will automatically build against a patched version of
+The simplest way to get the patch is to use my `zmk` remote, as configured in
+above manifest. This will automatically build against a patched version of
 Zephyr. If you are building using Github Actions, you may need to clear your
 cache (in the left sidebar on the `Actions` tab) for the changes to take effect.
 

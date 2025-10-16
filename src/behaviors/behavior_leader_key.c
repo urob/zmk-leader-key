@@ -271,6 +271,8 @@ static int behavior_leader_key_init(const struct device *dev) { return 0; }
 #define LEAD_INST(n)                                                                               \
     static struct leader_seq_cfg leader_sequences_##n[] = {                                        \
         DT_INST_FOREACH_CHILD_STATUS_OKAY_SEP_VARGS(n, PROP_SEQUENCES, (, ), sequence)};           \
+    BUILD_ASSERT(ARRAY_SIZE(leader_sequences_##n) <= CONFIG_ZMK_LEADER_MAX_SEQUENCES,              \
+                 "Number of leader sequences exceeds ZMK_LEADER_MAX_SEQUENCES limit");             \
     static const struct key_list leader_key_ignore_keys_##n = PROP_KEY_LIST(n, ignore_keys);       \
     static struct behavior_leader_key_config behavior_leader_key_config_##n = {                    \
         .sequences = leader_sequences_##n,                                                         \
